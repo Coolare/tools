@@ -1,0 +1,9 @@
+GitHub supports two-factor authentication (2FA) using a Time-based One-Time Password (TOTP) application. 
+This adds an extra layer of security to your account by requiring a unique, time-sensitive code in addition to your password during login.
+
+Popular TOTP apps compatible with GitHub include:
+Google Authenticator: A widely used, straightforward authenticator app available for mobile devices.
+Authy: Offers cloud-based backups and multi-device syncing for easier management of your 2FA tokens.
+Microsoft Authenticator: Provides similar features to Authy, including cloud backup and cross-device syncing.
+FreeOTP: An open-source option for two-factor authentication.
+2FAS: A mobile app supporting TOTP for various platforms
