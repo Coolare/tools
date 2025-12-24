@@ -1,0 +1,29 @@
+prometheus:
+  url: "http://localhost:9090"  # 正式时改为真实地址
+
+email:
+  from: "monitor@example.com"
+  to: "your@email.com"
+  password: ""  # 强烈建议用环境变量 EMAIL_PASSWORD 覆盖
+  smtp_server: "smtp.gmail.com:587"
+
+report:
+  html_path: "daily_report.html"
+  test_mode: true   # 测试模式：true 时使用模拟数据，无需 Prometheus
+
+metrics:
+  "CPU 使用率 (%)":
+    promql: "irate(node_cpu_seconds_total{mode!='idle'}[5m]) * 100"
+    threshold: 80
+    unit: "%"
+    draw_chart: true
+  "内存使用率 (%)":
+    promql: "(node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100"
+    threshold: 90
+    unit: "%"
+    draw_chart: true
+  "磁盘使用率 (%)":
+    promql: "100 * (node_filesystem_size_bytes - node_filesystem_avail_bytes) / node_filesystem_size_bytes"
+    threshold: 85
+    unit: "%"
+    draw_chart: true
