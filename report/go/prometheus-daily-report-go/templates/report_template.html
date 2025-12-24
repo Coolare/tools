@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="utf-8">
+    <title>每日监控报告 - {{ .Date }}</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; background: #f9f9f9; }
+        h1, h2 { color: #333; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; background: white; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        .alert { background-color: #ffebee; color: #c62828; font-weight: bold; }
+        .chart-container { margin: 40px 0; padding: 20px; background: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .alert-title { color: #c62828; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>每日监控报告 - {{ .Date }} ({{ .Start }} 至 {{ .End }})</h1>
+    
+    <h2>指标汇总</h2>
+    <table>
+        <tr><th>指标</th><th>当日平均值</th><th>阈值</th><th>单位</th><th>状态</th></tr>
+        {{ range $name, $data := .MetricsData }}
+        <tr class="{{ $data.State }}">
+            <td>{{ $name }}</td>
+            <td>{{ printf "%.2f" $data.Avg }}</td>
+            <td>{{ $data.Threshold }}</td>
+            <td>{{ $data.Unit }}</td>
+            <td>{{ if eq $data.State "alert" }}超过阈值！{{ else }}正常{{ end }}</td>
+        </tr>
+        {{ end }}
+    </table>
+    
+    <h2>趋势图表（交互式，多主机同图，可缩放/悬停）</h2>
+    <div class="chart-container">
+        {{ .ChartsHTML | safeHTML }}
+    </div>
+    
+    <h2>当前活跃告警</h2>
+    {{ if .Alerts }}
+    <table>
+        <tr><th>告警名称</th><th>严重度</th><th>描述</th></tr>
+        {{ range .Alerts }}
+        <tr class="alert">
+            <td>{{ .Name }}</td>
+            <td>{{ .Severity }}</td>
+            <td>{{ .Description }}</td>
+        </tr>
+        {{ end }}
+    </table>
+    {{ else }}
+    <p style="color: green; font-weight: bold; font-size: 1.2em;">无活跃告警，系统运行正常！</p>
+    {{ end }}
+</body>
+</html>
