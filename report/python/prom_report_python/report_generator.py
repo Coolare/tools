@@ -1,5 +1,5 @@
 import requests
-from datetime import datetime
+from datetime import datetime, timedelta
 from jinja2 import Environment, FileSystemLoader
 from weasyprint import HTML
 import matplotlib.pyplot as plt
@@ -17,37 +17,109 @@ def get_time_range():
     return start, end
 
 # 测试模式模拟数据
-test_series = {
-    "CPU 使用率 (%)": [
-        {'labels': 'node1', 'times': [datetime.now() - timedelta(hours=i) for i in range(6,0,-1)], 'values': [75, 80, 92, 85, 78, 70]},  # 突刺92%
-        {'labels': 'node2', 'times': [datetime.now() - timedelta(hours=i) for i in range(6,0,-1)], 'values': [70, 75, 80, 78, 72, 68]}
-    ],
-    "内存使用率 (%)": [
-        {'labels': 'node1', 'times': [...same times...], 'values': [76, 77, 78, 76, 75, 76]},
-        {'labels': 'node2', 'times': [...], 'values': [75, 76, 77, 75, 74, 76]}
-    ],
-    "磁盘使用率 (%)": [
-        {'labels': 'node1', 'times': [...], 'values': [87, 88, 89, 87, 88, 87]},  # 超阈值
-        {'labels': 'node2', 'times': [...], 'values': [84, 85, 86, 84, 85, 84]}
-    ]
-}
+def mock_series(name):
+    times = [datetime.now() - timedelta(minutes=30*i) for i in range(12, -1, -1)]
+    if "CPU" in name:
+        values1 = [70, 72, 75, 78, 92, 88, 85, 80, 78, 75, 72, 70, 68]  # node1 突刺
+        values2 = [68, 70, 72, 75, 78, 80, 78, 75, 72, 70, 68, 65, 64]  # node2
+        return [
+            {"labels": "node1", "times": times, "values": values1},
+            {"labels": "node2", "times": times, "values": values2}
+        ]
+    if "磁盘" in name:
+        values = [84, 85, 86, 86.5, 87, 87.5, 88, 87.8, 87.5, 87, 86.5, 86, 85.5]
+        return [{"labels": "node1", "times": times, "values": values}]
+    # 内存正常
+    values = [75, 76, 77, 76.5, 76, 77, 78, 77.5, 77, 76.5, 76, 75.5, 75]
+    return [{"labels": "node1", "times": times, "values": values}]
 
 def query_range(promql, start, end):
     if config['report']['test_mode']:
-        # 返回模拟数据（简化，实际可从 JSON 加载）
-        name = [k for k, v in METRICS.items() if v['promql'] == promql][0]
-        return test_series.get(name, [])
-    # 真实查询
-    params = {'query': promql, 'start': start.timestamp(), 'end': end.timestamp(), 'step': '300'}
-    resp = requests.get(f'{config["prometheus"]["url"]}/api/v1/query_range', params=params)
-    # 解析返回 series （类似之前代码）
-    # ... (省略解析逻辑，可参考之前版本)
-    return []  # 占位
+        for name, cfg in METRICS.items():
+            if cfg['promql'] in promql or promql in cfg['promql']:
+                return mock_series(name)
+        return []
+    
+    params = {
+        'query': promql,
+        'start': start.timestamp(),
+        'end': end.timestamp(),
+        'step': '300'  # 5分钟
+    }
+    resp = requests.get(f"{config['prometheus']['url']}/api/v1/query_range", params=params)
+    resp.raise_for_status()
+    results = resp.json()['data']['result']
+    series = []
+    for r in results:
+        labels = str(r['metric'])
+        values = r['values']
+        times = [datetime.fromtimestamp(t) for t, _ in values]
+        vals = [float(v) for _, v in values]
+        series.append({"labels": labels, "times": times, "values": vals})
+    return series
 
-# 其他函数（plot_to_base64 等）同之前
+def plot_to_base64(series_list, title, threshold):
+    if not series_list:
+        return None
+    fig, ax = plt.subplots(figsize=(10, 4.5))
+    for s in series_list:
+        ax.plot(s['times'], s['values'], marker='o', label=s['labels'])
+    ax.set_title(title, fontsize=14, fontweight='bold')
+    ax.set_ylabel(title.split('(')[1])
+    ax.grid(True, linestyle='--', alpha=0.7)
+    ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
+    ax.xaxis.set_major_locator(mdates.HourLocator(interval=2))
+    fig.autofmt_xdate()
+    if threshold:
+        ax.axhline(y=threshold, color='r', linestyle='--', linewidth=2, label=f'阈值 {threshold}')
+    ax.legend()
+    buf = BytesIO()
+    plt.savefig(buf, format='png', dpi=150, bbox_inches='tight')
+    plt.close(fig)
+    buf.seek(0)
+    return base64.b64encode(buf.read()).decode('utf-8')
 
 def generate_report():
+    start, end = get_time_range()
     alerts = get_active_alerts()
-    # ... 生成 metrics_data、chart、render 模板、写文件、转 PDF
-    # 同之前完整逻辑
-    return config['report']['pdf_path']
+    metrics_data = []
+
+    env = Environment(loader=FileSystemLoader('templates'))
+    template = env.get_template('report_template.html')
+
+    for name, cfg in METRICS.items():
+        series = query_range(cfg['promql'], start, end)
+        if not series:
+            continue
+        all_values = [v for s in series for v in s['values']]
+        avg = sum(all_values) / len(all_values) if all_values else 0
+        state = 'alert' if avg > cfg['threshold'] else 'normal'
+        chart = None
+        if cfg['draw_chart']:
+            chart = plot_to_base64(series, f"{name} 趋势图", cfg['threshold'])
+        metrics_data.append({
+            'name': name,
+            'avg': avg,
+            'threshold': cfg['threshold'],
+            'unit': cfg['unit'],
+            'state': state,
+            'chart': chart
+        })
+
+    html_content = template.render(
+        date=start.strftime("%Y年%m月%d日"),
+        start="00:00",
+        end=end.strftime("%H:%M"),
+        metrics=metrics_data,
+        alerts=alerts
+    )
+
+    html_path = config['report']['html_path']
+    pdf_path = config['report']['pdf_path']
+    with open(html_path, 'w', encoding='utf-8') as f:
+        f.write(html_content)
+
+    HTML(html_path).write_pdf(pdf_path)
+
+    print(f"PDF 报告生成成功：{pdf_path}")
+    return pdf_path

@@ -2,41 +2,44 @@
 <html lang="zh">
 <head>
     <meta charset="utf-8">
-    <title>每日监控报告 - {{ date }}</title>
+    <title>每日监控报告</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 40px; background: #f9f9f9; }
-        h1, h2 { color: #333; }
-        table { width: 100%; border-collapse: collapse; margin: 20px 0; background: white; }
-        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
-        th { background-color: #f2f2f2; }
-        .alert { background-color: #ffebee; color: #c62828; font-weight: bold; }
-        .normal { background-color: #e8f5e8; }
-        img { max-width: 100%; height: auto; margin: 20px 0; border: 1px solid #ddd; border-radius: 8px; }
-        .chart-title { font-weight: bold; margin-top: 40px; font-size: 1.2em; }
-        .alert-title { color: #c62828; }
+        @page { size: A4; margin: 2cm; }
+        body { font-family: "Microsoft YaHei", Arial, sans-serif; color: #333; line-height: 1.6; }
+        h1 { text-align: center; color: #2c3e50; border-bottom: 3px solid #3498db; padding-bottom: 10px; }
+        h2 { color: #2980b9; border-left: 5px solid #3498db; padding-left: 10px; margin-top: 30px; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        th, td { border: 1px solid #ddd; padding: 12px; text-align: center; }
+        th { background-color: #3498db; color: white; }
+        .alert { background-color: #fdf2f2 !important; color: #c0392b; font-weight: bold; }
+        .chart-title { font-size: 1.3em; font-weight: bold; color: #2c3e50; margin: 30px 0 10px 0; text-align: center; }
+        .alert-title { color: #e74c3c !important; }
+        img { max-width: 100%; height: auto; display: block; margin: 10px auto; border: 1px solid #eee; border-radius: 8px; }
+        .footer { text-align: center; margin-top: 50px; color: #95a5a6; font-size: 0.9em; }
     </style>
 </head>
 <body>
-    <h1>每日监控报告 - {{ date }} ({{ start }} 至 {{ end }})</h1>
+    <h1>每日监控报告</h1>
+    <p style="text-align:center; font-size:1.1em;">报告时间：{{ date }} ({{ start }} 至 {{ end }})</p>
     
     <h2>指标汇总</h2>
     <table>
-        <tr><th>指标</th><th>当日平均值</th><th>阈值</th><th>单位</th><th>状态</th></tr>
+        <tr><th>指标名称</th><th>当日平均值</th><th>阈值</th><th>单位</th><th>状态</th></tr>
         {% for item in metrics %}
         <tr class="{{ item.state }}">
-            <td>{{ item.name }}</td>
+            <td><strong>{{ item.name }}</strong></td>
             <td>{{ "%.2f" % item.avg }}</td>
             <td>{{ item.threshold }}</td>
             <td>{{ item.unit }}</td>
-            <td>{{ "超过阈值！" if item.state == 'alert' else "正常" }}</td>
+            <td>{% if item.state == 'alert' %}<span style="color:red;">超过阈值！</span>{% else %}正常{% endif %}</td>
         </tr>
         {% endfor %}
     </table>
     
-    <h2>趋势图表（多主机同图）</h2>
+    <h2>趋势图表</h2>
     {% for item in metrics %}
         {% if item.chart %}
-        <div class="chart-title {% if item.state == 'alert' %}alert-title{% endif %}">{{ item.name }} 趋势</div>
+        <div class="chart-title {% if item.state == 'alert' %}alert-title{% endif %}">{{ item.name }} 趋势图</div>
         <img src="data:image/png;base64,{{ item.chart }}" alt="{{ item.name }}">
         {% endif %}
     {% endfor %}
@@ -47,14 +50,18 @@
         <tr><th>告警名称</th><th>严重度</th><th>描述</th></tr>
         {% for a in alerts %}
         <tr class="alert">
-            <td>{{ a.name }}</td>
+            <td><strong>{{ a.name }}</strong></td>
             <td>{{ a.severity }}</td>
             <td>{{ a.description }}</td>
         </tr>
         {% endfor %}
     </table>
     {% else %}
-    <p style="color: green; font-weight: bold; font-size: 1.2em;">无活跃告警，系统运行正常！</p>
+    <p style="text-align:center; color:green; font-size:1.3em; font-weight:bold;">无活跃告警，系统运行正常！</p>
     {% endif %}
+    
+    <div class="footer">
+        <p>报告自动生成 · Prometheus 监控系统</p>
+    </div>
 </body>
 </html>

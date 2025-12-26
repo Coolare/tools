@@ -1,17 +1,17 @@
 prometheus:
-  url: "http://localhost:9090"  # 正式时改成真实地址
+  url: "http://your-prometheus:9090"  # 正式环境改为真实地址
 
 email:
-  from: "monitor@example.com"
-  to: "your@email.com"
-  password: ""  # 推荐用环境变量 EMAIL_PASSWORD 覆盖
+  from: "monitor@company.com"
+  to: "admin@company.com"
+  password: ""  # 推荐使用环境变量 EMAIL_PASSWORD 覆盖
   smtp_server: "smtp.gmail.com"
   smtp_port: 587
 
 report:
   html_path: "daily_report.html"
   pdf_path: "daily_report.pdf"
-  test_mode: true  # 测试模式：true 时使用模拟数据，无需 Prometheus
+  test_mode: true  # true = 使用模拟数据测试（无需 Prometheus），false = 真实查询
 
 metrics:
   "CPU 使用率 (%)":
@@ -25,7 +25,7 @@ metrics:
     unit: "%"
     draw_chart: true
   "磁盘使用率 (%)":
-    promql: "avg by(instance) (100 - (node_filesystem_avail_bytes / node_filesystem_size_bytes * 100))"
+    promql: "avg by(instance,mountpoint) (100 * (node_filesystem_size_bytes - node_filesystem_avail_bytes) / node_filesystem_size_bytes)"
     threshold: 85
     unit: "%"
     draw_chart: true
