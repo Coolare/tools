@@ -1,0 +1,59 @@
+# Multi-stage Dockerfile for Chromium (pyppeteer) + Python app
+# Builder: prepare python deps and download chromium to cache
+FROM python:3.11-slim AS builder
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install minimal tools and fonts to allow chromium download tools to run
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    wget ca-certificates fonts-noto-cjk \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy requirements and download python deps
+COPY requirements.txt /app/requirements.txt
+RUN python -m pip install --upgrade pip \
+    && pip install --no-cache-dir -r /app/requirements.txt
+
+# Trigger pyppeteer chromium download during build so final image does not download at runtime
+RUN python - <<'PY'
+from pyppeteer import chromium_downloader
+print("chromium revision:", chromium_downloader.chromium_revision)
+chromium_downloader.download_chromium()
+PY
+
+# Final image: slim python + system runtime libs + app (we copy pyppeteer local-chromium from builder)
+FROM python:3.11-slim
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+
+# Install runtime libs required by Chromium and fonts
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libnss3 libatk1.0-0 libatk-bridge2.0-0 libx11-xcb1 libxcomposite1 libxdamage1 libxrandr2 \
+    libgbm1 libasound2 libpangocairo-1.0-0 libxss1 libxtst6 libxcb1 libxrender1 libfontconfig1 \
+    fonts-noto-cjk ca-certificates wget \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy installed python packages from builder's site-packages (pip cache used)
+COPY --from=builder /usr/local/lib/python3.11 /usr/local/lib/python3.11
+COPY --from=builder /root/.local /root/.local
+
+# Copy pyppeteer's downloaded chromium cache (default location)
+COPY --from=builder /root/.local /root/.local
+
+# Copy project files (we expect to mount code at runtime, but copy as fallback)
+COPY . /app
+
+# Ensure output dir
+RUN mkdir -p /app/promreport/output && chmod -R 0775 /app/promreport/output
+
+# Create non-root user
+RUN useradd -m appuser && chown -R appuser /app
+USER appuser
+
+ENV PATH=/root/.local/bin:$PATH
+CMD ["python", "promreport/run_report.py", "--config", "promreport/config/config_test.yaml"]

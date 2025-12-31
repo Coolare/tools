@@ -1,0 +1,48 @@
+FROM python:3.11-slim
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV USE_WKHTMLTOPDF=1
+
+WORKDIR /app
+
+# Install runtime libs, fonts and tools, then install wkhtmltopdf from .deb
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+       ca-certificates \
+       wget \
+       gnupg2 \
+       xz-utils \
+       libxrender1 \
+       libfontconfig1 \
+       libfreetype6 \
+       libjpeg62-turbo \
+       libxext6 \
+       libx11-6 \
+       fonts-noto-cjk \
+       procps \
+    && rm -rf /var/lib/apt/lists/*
+
+# Download wkhtmltopdf deb and install (buster build commonly compatible)
+RUN wget -O /tmp/wkhtml.deb "https://github.com/wkhtmltopdf/packaging/releases/download/0.12.6-1/wkhtmltox_0.12.6-1.buster_amd64.deb" \
+    && dpkg -i /tmp/wkhtml.deb || apt-get update && apt-get install -y -f \
+    && rm -f /tmp/wkhtml.deb \
+    && rm -rf /var/lib/apt/lists/*
+
+# Ensure wkhtmltopdf is on PATH
+RUN if [ -f /usr/local/bin/wkhtmltopdf ]; then ln -sf /usr/local/bin/wkhtmltopdf /usr/bin/wkhtmltopdf || true; \
+    elif [ -f /usr/bin/wkhtmltopdf ]; then ln -sf /usr/bin/wkhtmltopdf /usr/local/bin/wkhtmltopdf || true; fi
+
+# Copy requirements; project mounted at runtime
+COPY requirements.txt /app/requirements.txt
+
+RUN python -m pip install --upgrade pip \
+    && pip install --no-cache-dir -r /app/requirements.txt
+
+# Create non-root user
+RUN useradd -m appuser && chown -R appuser /app
+USER appuser
+
+VOLUME ["/app"]
+WORKDIR /app
+
+CMD ["python", "promreport/run_report.py", "--config", "promreport/config/config_test.yaml"]

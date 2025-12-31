@@ -1,0 +1,57 @@
+# Multi-stage Dockerfile for wkhtmltopdf + Python app
+# Builder stage: download and extract wkhtmltopdf deb package
+FROM debian:bullseye-slim AS builder
+
+ENV DEBIAN_FRONTEND=noninteractive
+WORKDIR /tmp
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+       ca-certificates \
+       wget \
+       dpkg \
+    && rm -rf /var/lib/apt/lists/*
+
+# Download a known wkhtmltopdf Debian package (buster build). Adjust URL/version if needed.
+RUN wget -O wkhtml.deb "https://github.com/wkhtmltopdf/packaging/releases/download/0.12.6-1/wkhtmltox_0.12.6-1.buster_amd64.deb" \
+    && dpkg -x wkhtml.deb /out
+
+# Final stage: slim Python image with only runtime files, fonts and wkhtmltopdf copied from builder
+FROM python:3.11-slim
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install runtime libs required by wkhtmltopdf and CJK fonts
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+       libxrender1 \
+       libfontconfig1 \
+       libfreetype6 \
+       libjpeg62-turbo \
+       libxext6 \
+       libx11-6 \
+       fonts-noto-cjk \
+       ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy wkhtmltopdf binary and necessary libraries from builder
+COPY --from=builder /out/usr/bin/wkhtmltopdf /usr/local/bin/wkhtmltopdf
+COPY --from=builder /out/usr/lib/ /usr/lib/
+
+RUN chmod +x /usr/local/bin/wkhtmltopdf || true
+
+WORKDIR /app
+
+# Copy only requirements to leverage Docker cache; the project will typically be mounted at runtime.
+COPY requirements.txt /app/requirements.txt
+
+# Install Python dependencies
+RUN python -m pip install --upgrade pip \
+    && pip install --no-cache-dir -r requirements.txt
+
+# Create non-root user (optional)
+RUN useradd -m appuser && chown -R appuser /app
+USER appuser
+
+# Project will be mounted into /app at runtime; default command runs the report
+CMD ["python", "promreport/run_report.py"]

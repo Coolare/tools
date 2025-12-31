@@ -1,0 +1,57 @@
+smtp:
+  host: "smtp.example.com"
+  port: 587
+  username: "reporter@example.com"
+  password: "your_smtp_password"
+  use_tls: true
+
+email:
+  from: "reporter@example.com"
+  to:
+    - "manager@example.com"
+  subject_prefix: "[Daily Monitor Report]"
+
+prometheus:
+  url: "http://prometheus-server:9090"
+  timeout: 10
+
+report:
+  department: "运维部"
+  output_dir: "promreport/output"
+  font_path: "promreport/assets/NotoSansCJKsc-Regular.otf"  # 请放置中文字体到 assets
+  timezone: "Asia/Shanghai"
+  date: ""  # 空为当天
+  send_email: false
+  test_mode: true   # 关键：使用合成测试数据，不访问 Prometheus
+
+time_range:
+  start_hour: 0
+  end_hour: 18
+  step_seconds: 60
+
+metrics:
+  - id: cpu_usage
+    title: "CPU 使用率 (%)"
+    query: "100 - (avg by(instance)(irate(node_cpu_seconds_total{mode='idle'}[5m])) * 100)"
+    threshold: 85
+    legend: "instance"
+  - id: mem_usage
+    title: "内存使用率 (%)"
+    query: "(1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100"
+    threshold: 85
+    legend: "instance"
+  - id: disk_used_percent
+    title: "磁盘使用率 (%)"
+    query: "100 - (node_filesystem_avail_bytes{fstype!~\"tmpfs|overlay\"} / node_filesystem_size_bytes{fstype!~\"tmpfs|overlay\"} * 100)"
+    threshold: 90
+    legend: "instance"
+  - id: mysql_threads
+    title: "MySQL Threads Connected"
+    query: "mysql_global_status_threads_connected"
+    threshold: 200
+    legend: "instance"
+  - id: custom_metric
+    title: "自定义指标 example_metric"
+    query: "example_metric_total"
+    threshold: 100
+    legend: "job"

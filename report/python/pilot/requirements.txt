@@ -1,0 +1,8 @@
+pyyaml
+prometheus-api-client
+pandas
+numpy
+matplotlib
+jinja2
+pyppeteer
+Pillow
