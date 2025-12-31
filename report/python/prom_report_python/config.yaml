@@ -2,7 +2,7 @@ prometheus:
   url: "http://your-prometheus:9090"  # 正式环境改为真实地址
 
 email:
-  from: "monitor@company.com"
+  from: "colarescy@gmail.com"
   to: "admin@company.com"
   password: ""  # 推荐使用环境变量 EMAIL_PASSWORD 覆盖
   smtp_server: "smtp.gmail.com"

@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="utf-8">
+    <title>每日监控报告 - {{ date }}</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; background: #f9f9f9; }
+        h1, h2 { color: #333; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; background: white; }
+        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        .alert { background-color: #ffebee; color: #c62828; font-weight: bold; }
+        .normal { background-color: #e8f5e8; }
+        img { max-width: 100%; height: auto; margin: 20px 0; border: 1px solid #ddd; border-radius: 8px; }
+        .chart-title { font-weight: bold; margin-top: 40px; font-size: 1.2em; }
+        .alert-title { color: #c62828; }
+    </style>
+</head>
+<body>
+    <h1>每日监控报告 - {{ date }} ({{ start }} 至 {{ end }})</h1>
+    
+    <h2>指标汇总</h2>
+    <table>
+        <tr><th>指标</th><th>当日平均值</th><th>阈值</th><th>单位</th><th>状态</th></tr>
+        {% for item in metrics %}
+        <tr class="{{ item.state }}">
+            <td>{{ item.name }}</td>
+            <td>{{ "%.2f" % item.avg }}</td>
+            <td>{{ item.threshold }}</td>
+            <td>{{ item.unit }}</td>
+            <td>{{ "超过阈值！" if item.state == 'alert' else "正常" }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+    
+    <h2>趋势图表（多主机同图）</h2>
+    {% for item in metrics %}
+        {% if item.chart %}
+        <div class="chart-title {% if item.state == 'alert' %}alert-title{% endif %}">{{ item.name }} 趋势</div>
+        <img src="data:image/png;base64,{{ item.chart }}" alt="{{ item.name }}">
+        {% endif %}
+    {% endfor %}
+    
+    <h2>当前活跃告警</h2>
+    {% if alerts %}
+    <table>
+        <tr><th>告警名称</th><th>严重度</th><th>描述</th></tr>
+        {% for a in alerts %}
+        <tr class="alert">
+            <td>{{ a.name }}</td>
+            <td>{{ a.severity }}</td>
+            <td>{{ a.description }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+    {% else %}
+    <p style="color: green; font-weight: bold; font-size: 1.2em;">无活跃告警，系统运行正常！</p>
+    {% endif %}
+</body>
+</html>
