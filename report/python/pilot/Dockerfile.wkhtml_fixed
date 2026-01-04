@@ -1,0 +1,61 @@
+# Dockerfile.wkhtml_fixed2
+FROM python:3.11-slim
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV USE_WKHTMLTOPDF=1
+
+WORKDIR /app
+
+# 安装运行时依赖和工具（dpkg 解包需要 dpkg）
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+       ca-certificates wget dpkg xz-utils \
+       libxrender1 libfontconfig1 libfreetype6 libjpeg62-turbo libxext6 libx11-6 \
+       fonts-noto-cjk procps gnupg2 \
+    && rm -rf /var/lib/apt/lists/*
+
+# 下载 wkhtmltopdf deb 并解包到 /out，再把二进制和库复制到系统路径
+RUN set -eux; \
+    WK_DEB="/tmp/wkhtml.deb"; \
+    wget -O "$WK_DEB" "https://github.com/wkhtmltopdf/packaging/releases/download/0.12.6-1/wkhtmltox_0.12.6-1.buster_amd64.deb"; \
+    mkdir -p /out; \
+    dpkg -x "$WK_DEB" /out; \
+    # locate binary in common locations and copy it to /usr/local/bin
+    if [ -f /out/usr/local/bin/wkhtmltopdf ]; then \
+        cp /out/usr/local/bin/wkhtmltopdf /usr/local/bin/wkhtmltopdf; \
+    fi; \
+    if [ -f /out/usr/bin/wkhtmltopdf ]; then \
+        cp /out/usr/bin/wkhtmltopdf /usr/local/bin/wkhtmltopdf; \
+    fi; \
+    if [ -f /out/opt/wkhtmltox/bin/wkhtmltopdf ]; then \
+        cp /out/opt/wkhtmltox/bin/wkhtmltopdf /usr/local/bin/wkhtmltopdf; \
+    fi; \
+    # Copy possible libraries (be conservative, only copy if exist)
+    if [ -d /out/usr/lib ]; then cp -r /out/usr/lib/* /usr/lib/ || true; fi; \
+    if [ -d /out/lib ]; then cp -r /out/lib/* /usr/lib/ || true; fi; \
+    # ensure executable and strip symlinks
+    chmod +x /usr/local/bin/wkhtmltopdf || true; \
+    # debug: list the wkhtmltopdf and ldd output to ensure libs resolved
+    if [ -f /usr/local/bin/wkhtmltopdf ]; then \
+        echo "wkhtmltopdf found at /usr/local/bin/wkhtmltopdf"; \
+        /usr/local/bin/wkhtmltopdf --version || true; \
+        ldd /usr/local/bin/wkhtmltopdf || true; \
+    else \
+        echo "ERROR: wkhtmltopdf not found in extracted deb; ls /out:"; ls -R /out | sed -n '1,200p'; exit 1; \
+    fi; \
+    rm -f "$WK_DEB"
+
+# Copy requirements only (project will typically be mounted at runtime)
+COPY requirements.txt /app/requirements.txt
+
+RUN python -m pip install --upgrade pip \
+    && pip install --no-cache-dir -r /app/requirements.txt
+
+# Create non-root user and switch
+RUN useradd -m appuser && chown -R appuser /app
+USER appuser
+
+VOLUME ["/app"]
+WORKDIR /app
+
+CMD ["python", "promreport/run_report.py", "--config", "promreport/config/config_test.yaml"]
