@@ -1,0 +1,28 @@
+FROM python:3.11-slim
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV USE_WEASYPRINT=1
+
+WORKDIR /app
+
+# Install system libs required by WeasyPrint and fonts
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+    libcairo2 libpango-1.0-0 libgdk-pixbuf2.0-0 libffi7 libxml2 libxslt1.1 \
+    fonts-noto-cjk ca-certificates wget \
+ && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements and install
+COPY requirements.txt /app/requirements.txt
+RUN python -m pip install --upgrade pip \
+ && pip install --no-cache-dir -r /app/requirements.txt
+
+# non-root user
+RUN useradd -m appuser && chown -R appuser /app
+USER appuser
+
+# Project will normally be mounted at runtime
+VOLUME ["/app"]
+WORKDIR /app
+
+CMD ["python", "promreport/run_report.py", "--config", "promreport/config/config_test.yaml"]

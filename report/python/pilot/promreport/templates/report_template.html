@@ -31,14 +31,14 @@
         <tr>
           <td>部门</td>
           <td>{{ department }}</td>
+        </tr>
+        <tr>
           <td>报告时间范围</td>
           <td>{{ time_range }}</td>
         </tr>
         <tr>
           <td>生成时间</td>
           <td>{{ generated_at }}</td>
-          <td>关注点</td>
-          <td>异常为主要关注项，具体明细见下方</td>
         </tr>
       </table>
     </div>
@@ -46,7 +46,7 @@
     <div class="summary">
       <div class="card">
         <h2>摘要</h2>
-        <p class="small">下列为 00:00 至 18:00 期间的异常摘要：重点展示超阈值的指标和主机/实例。</p>
+        <p class="small">下列为 00:00 至 18:00 期间的异常摘要</p>
         <div style="display:flex; gap:12px; align-items:center; margin-top:8px;">
           <div style="flex:1;">
             <img src="{{ summary_chart }}" alt="summary">
@@ -76,7 +76,7 @@
     </div>
 
     <div class="footer">
-      本报告由监控平台自动生成。如需调整告警阈值或监控项，请联系运维团队。
+      本报告由监控平台自动生成。
     </div>
   </div>
 </body>
